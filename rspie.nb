@@ -1,0 +1,712 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 13.1' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[     26017,        704]
+NotebookOptionsPosition[     24636,        673]
+NotebookOutlinePosition[     24978,        688]
+CellTagsIndexPosition[     24935,        685]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell["Dipole Radiation numpy Function Generator", "Section",
+ CellChangeTimes->{{3.8873901925654535`*^9, 
+  3.887390216724431*^9}},ExpressionUUID->"27a8176d-3b8d-4bdc-8a19-\
+1a3da92a0920"],
+
+Cell[BoxData[
+ RowBox[{"Needs", "[", "\"\<ToPython`\>\"", "]"}]], "Input",
+ CellLabel->
+  "In[137]:=",ExpressionUUID->"1b423795-8ddb-463d-aab4-c754ff7bd5b2"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{
+   RowBox[{"StringSplitter", "::", "usage"}], "=", "\"\<Split a string\>\""}],
+   ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"StringSplitter", "[", 
+   RowBox[{"txt0_", ",", " ", "minLength_", ",", " ", "indent_", ",", 
+    RowBox[{"protectiveParen_:", "True"}]}], "]"}], ":=", 
+  RowBox[{"(", "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"If", "[", 
+     RowBox[{"protectiveParen", ",", "\[IndentingNewLine]", 
+      RowBox[{"txt", "=", 
+       RowBox[{"\"\<(\>\"", "<>", "txt0", "<>", "\"\<)\>\""}]}], ",", 
+      "\[IndentingNewLine]", 
+      RowBox[{"txt", "=", "txt0"}]}], "]"}], ";", "\[IndentingNewLine]", 
+    RowBox[{"ind", "=", 
+     RowBox[{"ConstantArray", "[", 
+      RowBox[{"\"\< \>\"", ",", "indent"}], "]"}]}], ";", 
+    "\[IndentingNewLine]", 
+    RowBox[{"ind", "=", 
+     RowBox[{"\"\<\\n\>\"", "<>", "ind"}]}], ";", "\[IndentingNewLine]", 
+    RowBox[{"chars", "=", 
+     RowBox[{"Characters", "[", "txt", "]"}]}], ";", "\[IndentingNewLine]", 
+    RowBox[{"arrow", "=", "0"}], ";", "\[IndentingNewLine]", 
+    RowBox[{"newTxt", "=", "\"\<\>\""}], ";", "\[IndentingNewLine]", 
+    RowBox[{"Do", "[", "\[IndentingNewLine]", 
+     RowBox[{
+      RowBox[{"(", "\[IndentingNewLine]", 
+       RowBox[{"If", "[", 
+        RowBox[{
+         RowBox[{"arrow", "\[GreaterEqual]", "minLength"}], ",", 
+         "\[IndentingNewLine]", 
+         RowBox[{"If", "[", 
+          RowBox[{
+           RowBox[{"char", "\[Equal]", "\"\< \>\""}], ",", 
+           "\[IndentingNewLine]", 
+           RowBox[{
+            RowBox[{"newTxt", "=", 
+             RowBox[{"newTxt", "<>", "ind"}]}], ";", "\[IndentingNewLine]", 
+            RowBox[{"newTxt", "=", 
+             RowBox[{"newTxt", "<>", "char"}]}], ";", "\[IndentingNewLine]", 
+            RowBox[{"arrow", "=", "0"}]}], ",", "\[IndentingNewLine]", 
+           RowBox[{"newTxt", "=", 
+            RowBox[{"newTxt", "<>", "char"}]}]}], "]"}], ",", 
+         "\[IndentingNewLine]", 
+         RowBox[{
+          RowBox[{"arrow", "+=", "1"}], ";", "\[IndentingNewLine]", 
+          RowBox[{"newTxt", "=", 
+           RowBox[{"newTxt", "<>", "char"}]}]}]}], "\[IndentingNewLine]", 
+        "]"}], ")"}], ",", "\[IndentingNewLine]", 
+      RowBox[{"{", 
+       RowBox[{"char", ",", "chars"}], "}"}]}], "\[IndentingNewLine]", "]"}], 
+    ";", "\[IndentingNewLine]", 
+    RowBox[{"Return", "[", "newTxt", "]"}], ";"}], "\[IndentingNewLine]", 
+   ")"}]}]}], "Input",
+ CellChangeTimes->{{3.887464166417432*^9, 3.8874642014291725`*^9}},
+ CellLabel->
+  "In[259]:=",ExpressionUUID->"15b1b0fc-87b4-46a8-9c64-be593d032a70"],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"funcTemplate", "=", 
+   RowBox[{
+   "StringTemplate", "[", 
+    "\"\<def `funName`(`args`):\n    '''\n    `docstring`\n    '''\n    \
+fieldvalue = `expression`\n    return fieldvalue\>\"", "]"}]}], 
+  ";"}]], "Input",
+ CellChangeTimes->{{3.8874636938728037`*^9, 3.8874637102132344`*^9}},
+ CellLabel->
+  "In[286]:=",ExpressionUUID->"401f550c-09ca-45fd-a5c6-b6b0ac0e9b32"],
+
+Cell[CellGroupData[{
+
+Cell["FullField & Field in Radiation Zone", "Subsection",
+ CellChangeTimes->{{3.887390736306046*^9, 3.8873907487444105`*^9}, {
+  3.887464536201438*^9, 
+  3.8874645424214506`*^9}},ExpressionUUID->"076611d8-4c72-4bde-a67d-\
+2142a43ce2a2"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{
+   RowBox[{"rvec", "=", 
+    RowBox[{"{", 
+     RowBox[{"x", ",", "y", ",", "z"}], "}"}]}], ";"}], 
+  RowBox[{"(*", 
+   RowBox[{"observation", " ", "point"}], "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"rdip", "=", 
+    RowBox[{"{", 
+     RowBox[{"xd", ",", "yd", ",", "zd"}], "}"}]}], ";"}], 
+  RowBox[{"(*", 
+   RowBox[{"position", " ", "of", " ", "dipole"}], 
+   "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"pdip", "=", 
+    RowBox[{"{", 
+     RowBox[{
+      RowBox[{
+       RowBox[{"Sin", "[", "\[Theta]dip", "]"}], 
+       RowBox[{"Cos", "[", "\[Phi]dip", "]"}]}], ",", 
+      RowBox[{
+       RowBox[{"Sin", "[", "\[Theta]dip", "]"}], 
+       RowBox[{"Sin", "[", "\[Phi]dip", "]"}]}], ",", 
+      RowBox[{"Cos", "[", "\[Theta]dip", "]"}]}], "}"}]}], ";"}], " ", 
+  RowBox[{"(*", 
+   RowBox[{"dir", " ", "of", " ", "dipole"}], "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"rhat", "=", 
+   RowBox[{"rvec", "-", "rdip"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"c", "=", "1"}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"r", "=", 
+    RowBox[{"\[Sqrt]", 
+     RowBox[{"(", 
+      RowBox[{"rhat", ".", "rhat"}], ")"}]}]}], ";"}], 
+  RowBox[{"(*", 
+   RowBox[{
+   "distance", " ", "from", " ", "dipole", " ", "to", " ", "observation", " ",
+     "point"}], "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"rhat", "=", 
+    RowBox[{"rhat", "/", "r"}]}], ";"}], 
+  RowBox[{"(*", 
+   RowBox[{
+   "unit", " ", "vector", " ", "from", " ", "dipole", " ", "to", " ", 
+    "observation", " ", "point"}], "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Efield", "=", 
+   RowBox[{"(", 
+    RowBox[{
+     RowBox[{
+      RowBox[{"(", 
+       RowBox[{
+        SuperscriptBox["\[Omega]", "2"], "/", 
+        RowBox[{"(", 
+         RowBox[{
+          SuperscriptBox["c", "2"], "r"}], ")"}]}], ")"}], 
+      RowBox[{"Cross", "[", 
+       RowBox[{
+        RowBox[{"Cross", "[", 
+         RowBox[{"rhat", ",", "pdip"}], "]"}], ",", "rhat"}], "]"}]}], 
+     "\[IndentingNewLine]", "+", 
+     RowBox[{
+      RowBox[{"(", 
+       RowBox[{
+        FractionBox["1", 
+         SuperscriptBox["r", "3"]], "-", " ", 
+        RowBox[{
+         RowBox[{"(", 
+          RowBox[{"I", " ", "\[Omega]"}], ")"}], "/", 
+         RowBox[{"(", 
+          RowBox[{"c", " ", 
+           SuperscriptBox["r", "2"]}], ")"}]}]}], ")"}], 
+      RowBox[{"(", 
+       RowBox[{
+        RowBox[{"3", " ", 
+         RowBox[{"rhat", ".", "pdip"}], " ", "rhat"}], "-", "pdip"}], 
+       ")"}]}]}], ")"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Efield", "=", 
+   RowBox[{"Simplify", "[", "Efield", "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"Efield", "=", 
+    RowBox[{"Efield", "*", 
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"Cos", "[", " ", 
+        RowBox[{"\[Omega]", " ", 
+         FractionBox["r", "c"]}], "]"}], "+", 
+       RowBox[{"I", " ", 
+        RowBox[{"Sin", "[", 
+         RowBox[{"\[Omega]", " ", 
+          FractionBox["r", "c"]}], "]"}]}]}], ")"}]}]}], ";"}], 
+  "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bfield", "=", 
+   RowBox[{"(", 
+    RowBox[{
+     RowBox[{"(", 
+      RowBox[{
+       SuperscriptBox["\[Omega]", "2"], "/", 
+       RowBox[{"(", 
+        RowBox[{
+         SuperscriptBox["c", "3"], "r"}], ")"}]}], ")"}], 
+     RowBox[{"Cross", "[", 
+      RowBox[{"rhat", ",", "pdip"}], "]"}], "*", 
+     RowBox[{"(", 
+      RowBox[{"1", "-", " ", 
+       RowBox[{"c", "/", 
+        RowBox[{"(", 
+         RowBox[{"I", " ", "\[Omega]", " ", "r"}], ")"}]}]}], ")"}]}], 
+    ")"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bfield", "=", 
+   RowBox[{"Simplify", "[", "Bfield", "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"Bfield", "=", 
+    RowBox[{"Bfield", "*", 
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"Cos", "[", " ", 
+        RowBox[{"\[Omega]", " ", 
+         FractionBox["r", "c"]}], "]"}], "+", 
+       RowBox[{"I", " ", 
+        RowBox[{"Sin", "[", 
+         RowBox[{"\[Omega]", " ", 
+          FractionBox["r", "c"]}], "]"}]}]}], ")"}]}]}], ";"}], 
+  "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bfieldfar", "=", 
+   RowBox[{
+    RowBox[{"(", 
+     FractionBox[
+      SuperscriptBox["\[Omega]", "2"], 
+      RowBox[{
+       SuperscriptBox["c", "3"], "r"}]], ")"}], 
+    RowBox[{"Cross", "[", 
+     RowBox[{"rhat", ",", "pdip"}], "]"}]}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bfieldfar", "=", 
+   RowBox[{"Simplify", "[", "Bfieldfar", "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"Bfieldfar", "=", 
+    RowBox[{"Bfieldfar", "*", 
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"Cos", "[", " ", 
+        RowBox[{"\[Omega]", " ", 
+         FractionBox["r", "c"]}], "]"}], "+", 
+       RowBox[{"I", " ", 
+        RowBox[{"Sin", "[", 
+         RowBox[{"\[Omega]", " ", 
+          FractionBox["r", "c"]}], "]"}]}]}], ")"}]}]}], ";"}], 
+  "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Efieldfar", "=", 
+   RowBox[{"c", " ", 
+    RowBox[{"Cross", "[", 
+     RowBox[{"Bfieldfar", ",", "rhat"}], "]"}]}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Efieldfar", "=", 
+   RowBox[{"Simplify", "[", "Efieldfar", "]"}]}], 
+  ";"}], "\[IndentingNewLine]"}], "Input",
+ CellChangeTimes->{{3.887303353268115*^9, 3.887303661542788*^9}, {
+   3.887303702961355*^9, 3.8873037565931168`*^9}, {3.88730406909167*^9, 
+   3.887304070023871*^9}, 3.887304113357086*^9, {3.887305198423362*^9, 
+   3.887305268223033*^9}, {3.8873911834625587`*^9, 3.88739120607835*^9}, {
+   3.8873912614575367`*^9, 3.8873913727963943`*^9}},
+ CellLabel->
+  "In[180]:=",ExpressionUUID->"6fdcc53f-08c7-4fec-a5e5-a20403aa1260"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"Efield", "=", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"ComplexExpand", "[", 
+      RowBox[{"Re", "[", "#", "]"}], "]"}], "&"}], "/@", "Efield"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Expy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Efield", "[", 
+       RowBox[{"[", "1", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Eypy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Efield", "[", 
+       RowBox[{"[", "2", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"Ezpy", "=", 
+    RowBox[{"ToPython", "[", 
+     RowBox[{
+      RowBox[{"Simplify", "[", 
+       RowBox[{"Efield", "[", 
+        RowBox[{"[", "3", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+   ";"}], "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Efieldfar", "=", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"ComplexExpand", "[", 
+      RowBox[{"Re", "[", "#", "]"}], "]"}], "&"}], "/@", "Efieldfar"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Exfarpy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Efieldfar", "[", 
+       RowBox[{"[", "1", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Eyfarpy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Efieldfar", "[", 
+       RowBox[{"[", "2", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"Ezfarpy", "=", 
+    RowBox[{"ToPython", "[", 
+     RowBox[{
+      RowBox[{"Simplify", "[", 
+       RowBox[{"Efieldfar", "[", 
+        RowBox[{"[", "3", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+   ";"}], "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bfield", "=", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"ComplexExpand", "[", 
+      RowBox[{"Re", "[", "#", "]"}], "]"}], "&"}], "/@", "Bfield"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bxpy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Bfield", "[", 
+       RowBox[{"[", "1", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bypy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Bfield", "[", 
+       RowBox[{"[", "2", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"Bzpy", "=", 
+    RowBox[{"ToPython", "[", 
+     RowBox[{
+      RowBox[{"Simplify", "[", 
+       RowBox[{"Bfield", "[", 
+        RowBox[{"[", "3", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+   ";"}], "\[IndentingNewLine]"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bfieldfar", "=", 
+   RowBox[{
+    RowBox[{
+     RowBox[{"ComplexExpand", "[", 
+      RowBox[{"Re", "[", "#", "]"}], "]"}], "&"}], "/@", "Bfieldfar"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bxfarpy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Bfieldfar", "[", 
+       RowBox[{"[", "1", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Byfarpy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Bfieldfar", "[", 
+       RowBox[{"[", "2", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"Bzfarpy", "=", 
+   RowBox[{"ToPython", "[", 
+    RowBox[{
+     RowBox[{"Simplify", "[", 
+      RowBox[{"Bfieldfar", "[", 
+       RowBox[{"[", "3", "]"}], "]"}], "]"}], ",", "\"\<np\>\""}], "]"}]}], 
+  ";"}]}], "Input",
+ CellChangeTimes->{{3.887303777516657*^9, 3.8873037899260683`*^9}, {
+  3.887303838155634*^9, 3.887303857902762*^9}, {3.887303913856341*^9, 
+  3.8873039920782824`*^9}, {3.887305300292368*^9, 3.8873053004509783`*^9}, {
+  3.8873906891148186`*^9, 3.887390689339803*^9}, {3.8873914148519297`*^9, 
+  3.887391458893243*^9}},
+ CellLabel->
+  "In[199]:=",ExpressionUUID->"03099b90-0807-4d8c-8cff-9ef33809ec9a"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"docstrings", "=", 
+   RowBox[{"<|", "\[IndentingNewLine]", 
+    RowBox[{
+     RowBox[{
+     "\"\<Edipx\>\"", "\[Rule]", 
+      "\"\<x-component of the electric field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) \
+including near-field components.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Edipy\>\"", "\[Rule]", 
+      "\"\<y-component of the electric field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) \
+including near-field components.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Edipz\>\"", "\[Rule]", 
+      "\"\<z-component of the electric field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) \
+including near-field components.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Edipfarx\>\"", "\[Rule]", 
+      "\"\<x-component of the electric field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) in \
+its radiation zone.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Edipfary\>\"", "\[Rule]", 
+      "\"\<y-component of the electric field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) in \
+its radiation zone.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Edipfarz\>\"", "\[Rule]", 
+      "\"\<z-component of the electric field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) in \
+its radiation zone.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Bdipx\>\"", "\[Rule]", 
+      "\"\<x-component of the magnetic field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) \
+including near-field components.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Bdipy\>\"", "\[Rule]", 
+      "\"\<y-component of the magnetic field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) \
+including near-field components.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Bdipz\>\"", "\[Rule]", 
+      "\"\<z-component of the magnetic field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) \
+including near-field components.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Bdipfarx\>\"", "\[Rule]", 
+      "\"\<x-component of the magnetic field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) in \
+its radiation zone.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Bdipfary\>\"", "\[Rule]", 
+      "\"\<y-component of the magnetic field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) in \
+its radiation zone.\>\""}], ",", "\[IndentingNewLine]", 
+     RowBox[{
+     "\"\<Bdipfarz\>\"", "\[Rule]", 
+      "\"\<z-component of the magnetic field at position (x, y, z) of an \
+electric dipole with frequency omega and located at position (xd, yd, zd) in \
+its radiation zone.\>\""}]}], "\[IndentingNewLine]", "|>"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"args", "=", 
+   RowBox[{"StringJoin", "[", 
+    RowBox[{"Riffle", "[", 
+     RowBox[{
+      RowBox[{
+       RowBox[{
+        RowBox[{"ToPython", "[", 
+         RowBox[{"#", ",", "\"\<np\>\""}], "]"}], "&"}], "/@", 
+       RowBox[{"Reduce`FreeVariables", "[", "Efield", "]"}]}], ",", 
+      "\"\<, \>\""}], "]"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"chunkWidth", "=", "70"}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"indent", "=", "4"}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"dipEFuncs", "=", 
+   RowBox[{"Table", "[", "\[IndentingNewLine]", 
+    RowBox[{
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"funName", "=", 
+        RowBox[{
+         RowBox[{"{", 
+          RowBox[{
+          "\"\<Edipx\>\"", ",", "\"\<Edipy\>\"", ",", "\"\<Edipz\>\"", ",", 
+           "\"\<Edipfarx\>\"", ",", "\"\<Edipfary\>\"", ",", 
+           "\"\<Edipfarz\>\""}], "}"}], "[", 
+         RowBox[{"[", "i", "]"}], "]"}]}], ";", "\[IndentingNewLine]", 
+       RowBox[{"expr", "=", 
+        RowBox[{"StringSplitter", "[", 
+         RowBox[{
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{
+            "Expy", ",", "Eypy", ",", "Ezpy", ",", "Exfarpy", ",", "Eyfarpy", 
+             ",", "Ezfarpy"}], "}"}], "[", 
+           RowBox[{"[", "i", "]"}], "]"}], ",", "chunkWidth", ",", "indent"}],
+          "]"}]}], ";", "\[IndentingNewLine]", 
+       RowBox[{"docstring", "=", 
+        RowBox[{"StringSplitter", "[", 
+         RowBox[{
+          RowBox[{"docstrings", "[", "funName", "]"}], ",", "chunkWidth", ",",
+           "indent", ",", "False"}], "]"}]}], ";", "\[IndentingNewLine]", 
+       RowBox[{"funcTemplate", "[", "\[IndentingNewLine]", 
+        RowBox[{"<|", "\[IndentingNewLine]", 
+         RowBox[{
+          RowBox[{"\"\<funName\>\"", "\[Rule]", "funName"}], ",", 
+          "\[IndentingNewLine]", 
+          RowBox[{"\"\<docstring\>\"", "\[Rule]", "docstring"}], ",", 
+          "\[IndentingNewLine]", 
+          RowBox[{"\"\<args\>\"", "->", "args"}], ",", " ", 
+          "\[IndentingNewLine]", 
+          RowBox[{"\"\<expression\>\"", "\[Rule]", "expr"}]}], 
+         "\[IndentingNewLine]", "|>"}], "\[IndentingNewLine]", "]"}]}], 
+      "\[IndentingNewLine]", ")"}], ",", "\[IndentingNewLine]", 
+     RowBox[{"{", 
+      RowBox[{"i", ",", "1", ",", "6"}], "}"}]}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"dipEFuncs", "=", 
+   RowBox[{"StringJoin", "[", 
+    RowBox[{"Riffle", "[", 
+     RowBox[{"dipEFuncs", ",", "\"\<\\n\\n\>\""}], "]"}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"dipBFuncs", "=", 
+   RowBox[{"Table", "[", "\[IndentingNewLine]", 
+    RowBox[{
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"funName", "=", 
+        RowBox[{
+         RowBox[{"{", 
+          RowBox[{
+          "\"\<Bdipx\>\"", ",", "\"\<Bdipy\>\"", ",", "\"\<Bdipz\>\"", ",", 
+           "\"\<Bdipfarx\>\"", ",", "\"\<Bdipfary\>\"", ",", 
+           "\"\<Bdipfarz\>\""}], "}"}], "[", 
+         RowBox[{"[", "i", "]"}], "]"}]}], ";", "\[IndentingNewLine]", 
+       RowBox[{"expr", "=", 
+        RowBox[{"StringSplitter", "[", 
+         RowBox[{
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{
+            "Bxpy", ",", "Bypy", ",", "Bzpy", ",", "Bxfarpy", ",", "Byfarpy", 
+             ",", "Bzfarpy"}], "}"}], "[", 
+           RowBox[{"[", "i", "]"}], "]"}], ",", "chunkWidth", ",", "indent"}],
+          "]"}]}], ";", "\[IndentingNewLine]", 
+       RowBox[{"docstring", "=", 
+        RowBox[{"StringSplitter", "[", 
+         RowBox[{
+          RowBox[{"docstrings", "[", "funName", "]"}], ",", "chunkWidth", ",",
+           "indent", ",", "False"}], "]"}]}], ";", "\[IndentingNewLine]", 
+       RowBox[{"funcTemplate", "[", "\[IndentingNewLine]", 
+        RowBox[{"<|", "\[IndentingNewLine]", 
+         RowBox[{
+          RowBox[{"\"\<funName\>\"", "\[Rule]", "funName"}], ",", 
+          "\[IndentingNewLine]", 
+          RowBox[{"\"\<docstring\>\"", "\[Rule]", "docstring"}], ",", 
+          "\[IndentingNewLine]", 
+          RowBox[{"\"\<args\>\"", "->", "args"}], ",", " ", 
+          "\[IndentingNewLine]", 
+          RowBox[{"\"\<expression\>\"", "\[Rule]", "expr"}]}], 
+         "\[IndentingNewLine]", "|>"}], "\[IndentingNewLine]", "]"}]}], 
+      "\[IndentingNewLine]", ")"}], ",", "\[IndentingNewLine]", 
+     RowBox[{"{", 
+      RowBox[{"i", ",", "1", ",", "6"}], "}"}]}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"dipBFuncs", "=", 
+   RowBox[{"StringJoin", "[", 
+    RowBox[{"Riffle", "[", 
+     RowBox[{"dipBFuncs", ",", "\"\<\\n\\n\>\""}], "]"}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"allFuncs", "=", 
+   RowBox[{"dipEFuncs", "<>", "\"\<\\n\\n\>\"", "<>", "dipBFuncs"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"allFuncs", "=", 
+   RowBox[{"StringReplace", "[", 
+    RowBox[{"allFuncs", ",", 
+     RowBox[{"\"\<\[Phi]\>\"", "->", "\"\<phi\>\""}]}], "]"}]}], 
+  ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"allFuncs", "=", 
+   RowBox[{
+   "\"\<#!/usr/bin/env python3\\n\\n# Code generated by rspie.nb: Dipole \
+Radiation numpy Function Generator\\n\\nimport numpy as np\\n\\n\>\"", "<>", 
+    "allFuncs", "<>", "\"\<\\n\\n\>\""}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{"Export", "[", 
+  RowBox[{
+  "\"\<D:/Zia_Lab/Codebase/rspie/emfields.py\>\"", ",", "allFuncs", ",", 
+   "\"\<Text\>\""}], "]"}]}], "Input",
+ CellChangeTimes->CompressedData["
+1:eJxTTMoPSmViYGAQBWIQ7al7+H/htzeOfRzaDEVA+o6XCBuI3vV0GgeInvAm
+QRRE36/KkAfRU54+VwbRiqz5RiB6nnOwH4iese9+OIgWsb0eB6YntiWBaAeV
+OWkg2ixZKRtEf7pTIjQbSLdos4iAaPfFWoUgej13aDGIFohMmwii18m+mgyi
+2SazKswB0kueBimC6IPzT5qB6PBYbnMQzfMlLg5Ez3N6mAWiLQ9J54Po6npl
+MJ228+Kk/SD/GbXMBdFFvKuWg+gMNq+TINq059clEP3m8+UbILrAoOcRiO7Z
+xvYCRC/7//Y1iN6hcfENiGb3m8Z7AEjLTcwTBNFRJl+8QfS+Y7mBIBoAfKzB
+Gw==
+  "],
+ CellLabel->
+  "In[311]:=",ExpressionUUID->"b64c5130-6d6d-4d01-a2d0-67364e25cad3"],
+
+Cell[BoxData["\<\"D:/Zia_Lab/Codebase/rspie/emfields.py\"\>"], "Output",
+ CellChangeTimes->{
+  3.8873916097976723`*^9, 3.887464144797248*^9, 3.887464263952567*^9, 
+   3.8874642954777718`*^9, 3.887464588441784*^9, {3.8874650796371336`*^9, 
+   3.8874651002879915`*^9}},
+ CellLabel->
+  "Out[322]=",ExpressionUUID->"3da10636-abd3-44d1-a74c-8379a4a24710"]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[""], "Input",
+ CellChangeTimes->{{3.887390840512906*^9, 3.8873908992604465`*^9}, {
+   3.887391038048257*^9, 3.8873910390701184`*^9}, 
+   3.887391607782278*^9},ExpressionUUID->"09f01d6f-a5fe-4984-bc28-\
+bd6a1bbd5f05"],
+
+Cell[BoxData["\<\"D:/Zia_Lab/Codebase/rspie/emfields.py\"\>"], "Output",
+ CellChangeTimes->{{3.8873908640801497`*^9, 3.8873908997763104`*^9}, 
+   3.887390988272298*^9, 3.887391039308792*^9},
+ CellLabel->
+  "Out[169]=",ExpressionUUID->"0aeb6b3c-4fae-4718-9b4e-882c02abd684"]
+}, Open  ]]
+}, Open  ]]
+}, Open  ]]
+},
+WindowSize->{803, 1348},
+WindowMargins->{{Automatic, -7}, {Automatic, 0}},
+FrontEndVersion->"12.0 for Microsoft Windows (64-bit) (April 8, 2019)",
+StyleDefinitions->"Default.nb"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[580, 22, 188, 3, 67, "Section",ExpressionUUID->"27a8176d-3b8d-4bdc-8a19-1a3da92a0920"],
+Cell[771, 27, 157, 3, 28, "Input",ExpressionUUID->"1b423795-8ddb-463d-aab4-c754ff7bd5b2"],
+Cell[931, 32, 2611, 59, 485, "Input",ExpressionUUID->"15b1b0fc-87b4-46a8-9c64-be593d032a70"],
+Cell[3545, 93, 405, 10, 124, "Input",ExpressionUUID->"401f550c-09ca-45fd-a5c6-b6b0ac0e9b32"],
+Cell[CellGroupData[{
+Cell[3975, 107, 236, 4, 53, "Subsection",ExpressionUUID->"076611d8-4c72-4bde-a67d-2142a43ce2a2"],
+Cell[4214, 113, 5843, 181, 562, "Input",ExpressionUUID->"6fdcc53f-08c7-4fec-a5e5-a20403aa1260"],
+Cell[10060, 296, 4351, 134, 371, "Input",ExpressionUUID->"03099b90-0807-4d8c-8cff-9ef33809ec9a"],
+Cell[CellGroupData[{
+Cell[14436, 434, 9265, 211, 1625, "Input",ExpressionUUID->"b64c5130-6d6d-4d01-a2d0-67364e25cad3"],
+Cell[23704, 647, 350, 6, 32, "Output",ExpressionUUID->"3da10636-abd3-44d1-a74c-8379a4a24710"]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[24091, 658, 229, 4, 28, "Input",ExpressionUUID->"09f01d6f-a5fe-4984-bc28-bd6a1bbd5f05"],
+Cell[24323, 664, 273, 4, 32, "Output",ExpressionUUID->"0aeb6b3c-4fae-4718-9b4e-882c02abd684"]
+}, Open  ]]
+}, Open  ]]
+}, Open  ]]
+}
+]
+*)
+

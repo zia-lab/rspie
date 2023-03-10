@@ -5,6 +5,7 @@ from subprocess import check_output
 import os
 import http.client, urllib
 from mysecrets import *
+from emfields import *
 
 def send_message(message):
     app_token = pushover_token
@@ -124,11 +125,49 @@ cmd_tool_dict = {
 
 class PhotoCircuit():
     '''
-    Parsing an RSoft circuit file.
+    Helper class to create a circuit file for RSoft.
+
+    To create a circuit file you need to provide a configuration
+    dictionary with the following keys:
+
+        'vars':  a dictionary with keys and values that will be used
+        to   form  the  symbols  table  of  the  circuit  file.  The
+        dictionary  must  include  the  key 'circuit_filename' which
+        will be used to export the circuit file to disk.
+
+        'segments':  a  list of dictionaries with keys sufficient to
+        define   them,  e.g.:  'structure',  'material',  'begin.x',
+        'begin.z',  'begin.width', 'begin.height', 'end.x', 'end.y',
+        'end.z',  'position_taper'.  To  figure  out  which keys are
+        necessary  the  best  way  is to create a similar circuit in
+        RSoft  and  inspect the values that it uses to specify it in
+        the corresponding circuit file.
+
+        'monitors':  a  list of dictionaries with keys sufficient to
+        define  them.  Again  best  way to figure out which keys are
+        sufficient   is  to  create  a  similar  circuit  in  RSoft.
+        'launch_fields': a list of dictionaries with keys sufficient
+        to  define them. Again best way to figure out which keys are
+        sufficient is to create a similar circuit in RSoft.
+    
+    This class has the following function attributes:
+        parse_config:  parses  the configuration dictionary and sets
+        the corresponding attributes of the class.
+
+        block_parser:  parses  the  blocks  that define the circuit.
+        make_circuit_text:  creates  the  circuit file text from the
+        configuration   dictionary   and   the   attributes  set  by
+        parse_config.
+
+        parse_vars:  parses  the  variables  dictionary and sets the
+        corresponding  attributes  of the class. write_circuit_file:
+        writes  the circuit file to disk. run: runs the circuit file
+        using  the  simulation  tool  specified in the configuration
+        dictionary.
     '''
     def __init__(self, config):
         self.vars = config['vars']
-        self.full_filename = os.path.join(os.getcwd(),self.vars['filename'])
+        self.full_filename = os.path.join(os.getcwd(), self.vars['filename'])
         self.segments = config['segments']
         self.monitors = config['monitors']
         self.launch_fields = config['launch_fields']
@@ -137,25 +176,34 @@ class PhotoCircuit():
         self.executable = cmd_tool_dict[self.vars['sim_tool']]
     
     def parse_config(self):
+        '''
+        Put everything together
+        '''
         self.parse_vars()
         self.num_segments, self.segment_block = self.block_parser(self.segments, 'segment')
         self.num_monitors, self.monitor_block = self.block_parser(self.monitors, 'time_monitor', self.num_segments)
         self.num_launch_fields, self.launch_field_block = self.block_parser(self.launch_fields, 'launch_field')
 
-    def block_parser(self, block_dict, block_header, offset=0):
+    def block_parser(self, block_dicts, block_header, offset=0):
         '''
+        Create  a string of definitions using the key-value pairs in
+        the  given  dictionary,  prepending  and  appending adequate
+        headers and footers.
+
         Parameters
         ----------
-        block_dict (dict): dictionary of the block
+        block_dicts (list): a list with dictionaries defining the block
+        block_header (str): header of the block (e.g. 'segment')
+        offset (int)      : offset to add to the index of the block
 
         Returns
         -------
-        block (str): the block as a string
+        (tuple) (block_length (int) , block(str))
         '''
         blocks = []
-        for idx, segments in enumerate(block_dict):
+        for idx, chunk in enumerate(block_dicts):
             block = ['%s %d' % (block_header, idx+1+offset)]
-            for var, var_value in segments.items():
+            for var, var_value in chunk.items():
                 if type(var_value) == str:
                     block.append('\t%s = %s' % (var, var_value))
                 elif type(var_value) == int:
@@ -167,10 +215,31 @@ class PhotoCircuit():
         return len(blocks), '\n\n'.join(blocks) 
     
     def make_circuit_text(self):
+        '''
+        Put together the circuit text from the its segments,
+        monitors, launch fields and variables.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        circuit_text (str): the circuit text
+        '''
         return '\n\n'.join([self.var_block, self.segment_block, self.monitor_block, self.launch_field_block])
 
     def parse_vars(self):
-        # parse the variables as attributes to self
+        '''
+        Parse self.vars as instance attributes.
+
+        Parameters
+        ----------
+        None
+        Returns
+        -------
+        None
+        '''
         if type(self.vars) == 'str':
             self.var_block = self.vars
         else:
@@ -213,7 +282,7 @@ class PhotoCircuit():
         # in the philosophy of this script, any change in parameters
         # should be reflected in the circuit file, so we don't need to
         # use the options to change parameter values.
-        # If using command line flags is necessary a custom
+        # If using command line flags is necessary, a custom
         # command line parser should be written.
         cmd = [self.executable, self.full_filename, 'wait=0']
         check_output(cmd, shell=True)
@@ -328,3 +397,133 @@ def load_3d_dat(fname):
     z_coords = np.linspace(z_min, z_max, z_data_points)
     num_array = np.transpose(num_array, (1,2,0))
     return x_coords, y_coords, z_coords, num_array
+
+def load_2d_dat(fname):
+    '''
+    This function can be used to load a 2D .dat file from RSoft.
+    It assumes that the file has real-valued data.
+
+    Parameters
+    ----------
+    fname (str): path to the .dat file
+
+    Returns
+    -------
+    x_coords, y_coords, z_coords, num_array (tuple): (x_coords, y_coords, z_coords, num_array)
+        x_coords (np.ndarray): 1D array of the x coordinates
+        y_coords (np.ndarray): 1D array of the y coordinates
+        num_array (np.ndarray): 2D array of the data with each row corresponding to strip of 
+                                constant y and each column corresponding to a strip of constant x.
+                                The first row corresponds to the lowest (x,y) value pair.
+    '''
+    data_lines = open(fname,'r').readlines()
+    metadata_X = data_lines[2].split(' ')[:3]
+    metadata_Y = data_lines[3].split(' ')[:3]
+    x_data_points, x_min, x_max = [float(x) for x in metadata_X]
+    x_data_points = int(x_data_points)
+    y_data_points, y_min, y_max = [float(x) for x in metadata_Y]
+    y_data_points = int(y_data_points)
+    data_lines = data_lines[4:]
+    num_array = []
+    for line in data_lines:
+        nums = line.split('  ')
+        nums = [float(x) for x in nums]
+        num_array.append(nums)
+    num_array = np.array(num_array)
+    x_coords = np.linspace(x_min, x_max, x_data_points)
+    y_coords = np.linspace(y_min, y_max, y_data_points)
+    num_array = num_array.T
+    return x_coords, y_coords, num_array
+
+def save_2D_array_to_dat(fname, data_array, wavelength, xmin, xmax, ymin, ymax):
+    '''
+    This function saves a 2D array to a dat file that can be read by RSoft.
+    xmin, xmax, ymin, ymax need to match the bounds of the simulation volume
+    in the RSoft simulation where the file will be used as input.
+
+    Parameters
+    ----------
+    fname (str)  : The filename where the data will be saved.
+    data_array (numpy.ndarray) : The 2D array that will be saved.
+    wavelength (float) : The wavelength of the simulation.
+    xmin (float) : The minimum x value of the simulation.
+    xmax (float) : The maximum x value of the simulation.
+    ymin (float) : The minimum y value of the simulation.
+    ymax (float) : The maximum y value of the simulation.
+
+    Returns
+    -------
+    None
+    '''
+    num_elements_y, num_elements_x = data_array.shape
+    header = '''/rn,a,b/nx0/ls1
+/r,qa,qb
+{num_elements_x} {xmin} {xmax} 0 OUTPUT_AMPLITUDE_3D Wavelength={wavelength}
+{num_elements_y} {ymin} {ymax}'''.format(num_elements_x=num_elements_x,
+                                             num_elements_y=num_elements_y,
+                                             xmin=xmin, xmax=xmax, 
+                                             ymin=ymin, ymax=ymax,
+                                             wavelength=wavelength)
+    np.savetxt(fname,
+        data_array.T,
+        fmt='%1.5E',
+        delimiter='  ',
+        newline='\n',
+        header=header,
+        footer='',
+        comments='')
+    return None
+
+# dipole fields
+
+def dipole_field(x,y,z,xd,yd,zd,thetadip,phidip,omega):
+    '''
+    Calculates the electric and magnetic fields of an electric dipole.
+
+    Parameters
+    ----------
+    x, y, z          : (float, float, float) coordinates of the point where the field is calculated
+    xd, yd, zd       : (float, float, float) coordinates of the dipole
+    thetadip, phidip : (float, float) polar and azimuthal angles of the dipole moment
+    omega            : (float) frequency of the dipole
+
+    Returns
+    -------
+    EBfield : (np.array) electric and magnetic fields (Ex, Ey, Ez, Bx, By, Bz)
+
+    '''
+    EBfield = np.array([Edipx(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Edipy(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Edipz(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Bdipx(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Bdipy(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Bdipz(x,xd,y,yd,z,zd,thetadip,phidip,omega)])
+    return EBfield
+
+def dipole_field_far(x,y,z,xd,yd,zd,thetadip,phidip,omega):
+    '''
+    Calculates the electric and magnetic fields of an electric dipole in the
+    radiation zone.
+
+    Parameters
+    ----------
+    x, y, z          : (float, float, float) coordinates of the point where the field is calculated
+    xd, yd, zd       : (float, float, float) coordinates of the dipole
+    thetadip, phidip : (float, float) polar and azimuthal angles of the dipole moment
+    omega            : (float) frequency of the dipole
+
+    Returns
+    -------
+    EBfield : (np.array) electric and magnetic fields (Ex, Ey, Ez, Bx, By, Bz)
+
+    '''
+    EBfield = np.array([Edipfarx(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Edipfary(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Edipfarz(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Bdipfarx(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Bdipfary(x,xd,y,yd,z,zd,thetadip,phidip,omega),
+                        Bdipfarz(x,xd,y,yd,z,zd,thetadip,phidip,omega)])
+    return EBfield
+
+# dipField = np.vectorize(dipField, excluded=['z', 'xd','yd','zd','thetadip','phidip','omega'])
+
