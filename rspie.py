@@ -6,6 +6,233 @@ import os
 import http.client, urllib
 from mysecrets import *
 from emfields import *
+from scipy.interpolate import interp1d
+from tqdm import tqdm
+
+nanolib_rectangular_template = '''
+
+Angle = 0
+Aspect = 1
+Fill = 0.25
+Har = 8
+HarShow = 1
+Offset = 0.05
+Period = 0.4
+PillarHeight = PillarWidth*Aspect
+PillarIndex = 1.5
+PillarLength = 0.6
+PillarMin = 1e-06
+PillarWidth = Period*Fill
+SubHeight = 0.2
+SubstrateHeight = 0.2
+SubstrateIndex = 1.2
+alpha = 0
+background_index = 1
+boundary_max = Period/2
+boundary_max_y = Period/2
+boundary_min = -Period/2
+boundary_min_y = -Period/2
+cad_aspectratio_x = 1
+cad_aspectratio_y = 1
+delta = index-background_index
+dimension = 3
+domain_max = PillarLength+Offset
+domain_min = -Offset
+eim = 0
+free_space_wavelength = 0.46
+height = width
+index = background_index
+k0 = (2*pi)/free_space_wavelength
+lambda = free_space_wavelength
+launch_angle = 0
+launch_normalization = 2
+launch_theta = 0
+most_measurement_warning = 0
+plot_aspectratio = 1
+polarization = 0
+rcwa_allhomo_warning = 0
+rcwa_float = 0
+rcwa_harmonics_x = Har
+rcwa_harmonics_y = Har
+rcwa_launch_delta_phase = 0
+rcwa_launch_pol = 0
+rcwa_output_absorption = 1
+rcwa_output_diff_refl = 1
+rcwa_output_diff_trans = 1
+rcwa_output_nhx = HarShow
+rcwa_output_nhy = HarShow
+rcwa_output_option = 1
+rcwa_output_total_refl = 1
+rcwa_output_total_trans = 1
+sim_tool = ST_DIFFRACTMOD
+structure = STRUCT_CHANNEL
+width = 1
+
+
+
+segment 1
+	structure = STRUCT_CHANNEL
+	comp_name = Substrate
+	begin.x = 0
+	begin.z = -SubstrateHeight
+	begin.height = Period
+	begin.width = Period
+	begin.delta = SubstrateIndex-background_index
+	end.x = 0 rel begin segment 1
+	end.y = 0 rel begin segment 1
+	end.z = SubHeight rel begin segment 1
+	end.height = Period
+	end.width = Period
+	end.delta = SubstrateIndex-background_index
+end segment
+
+segment 2
+	comp_name = Pillar
+	extended = 1
+	width_taper = TAPER_LINEAR
+	height_taper = TAPER_LINEAR
+	begin.x = 0 rel end segment 1
+	begin.y = 0 rel end segment 1
+	begin.z = 0 rel end segment 1
+	begin.height = max(PillarHeight,PillarMin)
+	begin.width = max(PillarWidth,PillarMin)
+	begin.delta = PillarIndex-background_index
+	begin.euler_psi = -Angle
+	end.x = 0 rel begin segment 2
+	end.y = 0 rel begin segment 2
+	end.z = PillarLength rel begin segment 2
+	end.height = max(PillarHeight,PillarMin)
+	end.width = max(PillarWidth,PillarMin)
+	end.delta = PillarIndex-background_index
+end segment
+
+time_monitor 3
+	profile_type = PROF_INACTIVE
+	color = 2
+	comp_name = Port1
+	type = TIMEMON_EXTENDED
+	timeaverage = 2
+	monitoroutputmask = 1024
+	portnum = 1
+	phi = default
+	begin.x = 0 rel end segment 2
+	begin.y = 0 rel end segment 2
+	begin.z = 0 rel end segment 2
+	begin.height = Period
+	begin.width = Period
+end time_monitor
+
+
+
+
+
+text_block 1
+	name = MOST
+	text =
+RSScanOptFormat1
+
+[MODE] 
+SCAN
+
+PREFIX mosttmp
+PREFIX_STYLE 0
+CLUSTER 0 0 0 0 1 ""
+USERSIM_CALLSTYLE 0 0
+
+[SIMULATION]
+SIMTOOL ST_DEFAULT 
+WINDOW_SIZE 0
+VERBOSITY 0
+PRE_WHOLE_CMD 
+POST_WHOLE_CMD 
+PRE_CMD 
+POST_CMD 
+PREPOST_ACTIVE 0
+PREPOST_ERRCODES 0
+EXTRA_DATAINDEX_CMDS 
+
+[ALGORITHM]
+NAME root_1d_brent
+MAXSTEPS DEFAULT  1000
+CONVERGENCE DEFAULT  1.0e-7
+
+[INDEPENDENT_VARIABLES_SCAN]
+IV_Declarations
+SYMTAB_SCALAR Har N :  IV_LINEAR_INCR : 0 : 16 : 2 : 9 :  :  :
+SYMTAB_SCALAR PillarWidth Y :  IV_LINEAR_INCR : 0 : Period : 0.02 : 21 :  :  :
+
+[INDEPENDENT_VARIABLES_OPT]
+IV_Declarations
+
+IV_InitialValues
+
+[MEASUREMENTS:ST_FULLWAVE]
+STANDARD fw_mon_1_power_last Y 
+
+[MEASUREMENTS:ST_DIFFRACTMOD]
+STANDARD dm_de_a_total_single Y 
+STANDARD dm_de_r_0_0_single Y 
+STANDARD dm_de_r_total_single Y 
+STANDARD dm_de_t_0_0_single Y 
+STANDARD dm_de_t_total_single Y 
+
+[MEASUREMENTS:ST_FWMPI]
+STANDARD fw_mon_1_power_last Y 
+
+[METRICS]
+
+	end text
+end text_block
+
+text_block 2
+	name = MOST_BSDFGEN
+	text =
+RSScanOptFormat1
+
+[MODE] 
+SCAN
+
+PREFIX mosttmp
+PREFIX_STYLE 0
+CLUSTER 0 0 0 0 1 ""
+USERSIM_CALLSTYLE 0 0
+
+[SIMULATION]
+SIMTOOL ST_USER bsdfgen
+WINDOW_SIZE 1
+VERBOSITY 0
+PRE_WHOLE_CMD 
+POST_WHOLE_CMD 
+PRE_CMD 
+POST_CMD 
+PREPOST_ACTIVE 0
+PREPOST_ERRCODES 0
+EXTRA_DATAINDEX_CMDS 
+
+[ALGORITHM]
+NAME root_1d_brent
+MAXSTEPS DEFAULT  1000
+CONVERGENCE DEFAULT  1.0e-7
+
+[INDEPENDENT_VARIABLES_SCAN]
+IV_Declarations
+SYMTAB_SCALAR PillarWidth Y :  IV_LINEAR_STEPS : 0 : Period : 0.02 : 21 :  :  :
+SYMTAB_SCALAR PillarHeight N :  IV_LINEAR_STEPS : 0 : Period : 0.02 : 21 :  :  :
+SYMTAB_SCALAR Fill N :  IV_LINEAR_STEPS : 0 : 1 : 0.05 : 21 :  :  :
+SYMTAB_SCALAR Aspect N :  IV_LINEAR_STEPS : 0 : 1 : 0.25 : 5 :  :  :
+SYMTAB_SCALAR Angle N :  IV_LINEAR_STEPS : 0 : 90 : 15 : 7 :  :  :
+
+[INDEPENDENT_VARIABLES_OPT]
+IV_Declarations
+
+IV_InitialValues
+
+[METRICS]
+
+	end text
+end text_block
+
+'''
 
 def send_message(message):
     app_token = pushover_token
@@ -146,6 +373,7 @@ class PhotoCircuit():
         'monitors':  a  list of dictionaries with keys sufficient to
         define  them.  Again  best  way to figure out which keys are
         sufficient   is  to  create  a  similar  circuit  in  RSoft.
+        
         'launch_fields': a list of dictionaries with keys sufficient
         to  define them. Again best way to figure out which keys are
         sufficient is to create a similar circuit in RSoft.
@@ -409,14 +637,16 @@ def load_2d_dat(fname):
 
     Returns
     -------
-    x_coords, y_coords, z_coords, num_array (tuple): (x_coords, y_coords, z_coords, num_array)
+    (tuple): (x_coords, y_coords, num_array, file_format)
         x_coords (np.ndarray): 1D array of the x coordinates
         y_coords (np.ndarray): 1D array of the y coordinates
         num_array (np.ndarray): 2D array of the data with each row corresponding to strip of 
                                 constant y and each column corresponding to a strip of constant x.
                                 The first row corresponds to the lowest (x,y) value pair.
+        file_format (str): the format of the data in the file
     '''
     data_lines = open(fname,'r').readlines()
+    field_format = data_lines[2].split(' ')[4]
     metadata_X = data_lines[2].split(' ')[:3]
     metadata_Y = data_lines[3].split(' ')[:3]
     x_data_points, x_min, x_max = [float(x) for x in metadata_X]
@@ -432,8 +662,14 @@ def load_2d_dat(fname):
     num_array = np.array(num_array)
     x_coords = np.linspace(x_min, x_max, x_data_points)
     y_coords = np.linspace(y_min, y_max, y_data_points)
+    if field_format == 'OUTPUT_REAL_IMAG_3D':
+        num_array = num_array[:,0::2] + 1j*num_array[:,1::2]
+    elif field_format == 'OUTPUT_AMP_PHASE_3D':
+        phase_const = 1j/180*np.pi
+        num_array = num_array[:,0::2]*np.exp(phase_const*num_array[:,1::2])
     num_array = num_array.T
-    return x_coords, y_coords, num_array
+    return field_format, x_coords, y_coords, num_array
+
 
 def save_2D_array_to_dat(fname, data_array, wavelength, xmin, xmax, ymin, ymax):
     '''
@@ -456,17 +692,26 @@ def save_2D_array_to_dat(fname, data_array, wavelength, xmin, xmax, ymin, ymax):
     None
     '''
     num_elements_y, num_elements_x = data_array.shape
+    dtype = str(data_array.dtype)
+    if 'complex' in dtype:
+        fmt = '%1.5E  %1.5E  '* int(data_array.shape[0])
+        format = 'OUTPUT_REAL_IMAG_3D'
+    else:
+        fmt = '%1.5E'
+        format = 'OUTPUT_AMPLITUDE_3D'
     header = '''/rn,a,b/nx0/ls1
-/r,qa,qb
-{num_elements_x} {xmin} {xmax} 0 OUTPUT_AMPLITUDE_3D Wavelength={wavelength}
-{num_elements_y} {ymin} {ymax}'''.format(num_elements_x=num_elements_x,
-                                             num_elements_y=num_elements_y,
-                                             xmin=xmin, xmax=xmax, 
-                                             ymin=ymin, ymax=ymax,
-                                             wavelength=wavelength)
+    /r,qa,qb
+    {num_elements_x} {xmin} {xmax} 0 {format} Wavelength={wavelength}
+    {num_elements_y} {ymin} {ymax}'''.format(format=format,
+                                                num_elements_x=num_elements_x,
+                                                num_elements_y=num_elements_y,
+                                                xmin=xmin, xmax=xmax, 
+                                                ymin=ymin, ymax=ymax,
+                                                wavelength=wavelength)
+
     np.savetxt(fname,
         data_array.T,
-        fmt='%1.5E',
+        fmt=fmt,
         delimiter='  ',
         newline='\n',
         header=header,
@@ -525,5 +770,323 @@ def dipole_field_far(x,y,z,xd,yd,zd,thetadip,phidip,omega):
                         Bdipfarz(x,xd,y,yd,z,zd,thetadip,phidip,omega)])
     return EBfield
 
-# dipField = np.vectorize(dipField, excluded=['z', 'xd','yd','zd','thetadip','phidip','omega'])
+def intervalspace(lmin, lmax, dx, symm='even'):
+    '''
+This  function  returns  a  numpy  array  of evenly spaced points
+between  lmin  and  lmax with a spacing of dx. If symm is 'even',
+the  array  will  have  an  even  number  of points symmetrically
+distributed  about  the midpoint without including it. If symm is
+'odd', the array will have an odd number of points with the given
+points  symmetrically  distributed  about the midpoint, including
+the  midpoint  itself. Given this the given array may not contain
+the endpoints lmin and lmax.
 
+    Parameters
+    ----------
+    lmin (float) : the minimum value of the interval
+    lmax (float) : the maximum value of the interval
+    dx (float)   : the spacing between points
+    symm (str)   : wheter to include the midpoint or not.
+
+    Returns
+    -------
+    interspace (numpy array): The evenly spaced array of points
+    '''
+    l = (lmax - lmin)/2
+    rsteps = int(l/dx)
+    if symm == 'even':
+        rspace = np.linspace(dx/2, dx/2 + dx*rsteps, rsteps+1)[:-1]
+        lspace = -rspace[-1::-1]
+        interspace = np.concatenate((lspace, rspace))
+    else:
+        rspace = np.linspace(0, dx*rsteps, rsteps+1)
+        lspace = -rspace[-1:0:-1]
+        interspace = np.concatenate((lspace, rspace))
+    interspace =  (lmin+lmax)/2 + interspace
+    return interspace
+
+def metamaker(metal_config):
+    '''
+    This function takes a dictionary of parameters defining a metalens
+    and returns a circuit object that corresponds to it.
+    The circuit also includes a launch field consisting of a plane wave
+    incident at normal incidence.
+    The circuit also includes a DFT monitor that monitors the field at
+    the end of the pillars and saves Ex, Ey, Ez, Hx, Hy, Hz when the circuit
+    is run.
+
+    Parameters
+    ----------
+    metal_config : dict
+        A dictionary of parameters defining a metasurface. The keys are:
+        ApertureRadius : float
+            The radius of the aperture in the metasurface.
+        period : float
+            The period of the square grid of pillars in the metasurface.
+        PillarHeight : float
+            The height of the pillars in the metasurface.
+        circuitFname : str
+            The name of the file to save the circuit to.
+        PillarIndex : float
+            The index of refraction of the pillars.
+        SubstrateIndex : float
+            The index of refraction of the substrate.
+        background_index : float
+            The index of refraction of the background.
+        free_space_wavelength : float
+            The wavelength of the light in free space.
+        phase_func : function
+            A function that takes in x and y coordinates and returns the
+            radius that a post at that location should have. For example
+            this could be the classical Fresnel phase profile.
+        pillar_func : function
+            A function that takes in a phase and returns the width that
+            a post at that location should have to impart that phase. This
+            would usually be a function that is an interpolation radii and
+            phases that a previous simulation should have provided.
+    Returns
+    -------
+    circuit : rspie.circuit.Circuit
+    '''
+    apertureRadius = metal_config['ApertureRadius']
+    period = metal_config['period']
+    phase_func = metal_config['phase_func']
+    pillar_func = metal_config['pillar_func']
+
+    # Create the pillar grid
+    x = intervalspace(-apertureRadius, apertureRadius, period, 'odd')
+    y = intervalspace(-apertureRadius, apertureRadius, period, 'odd')
+    xgrid, ygrid = np.meshgrid(x,y)
+    # calculate the required phases across the surface of the metalens
+    phase_map = phase_func(xgrid, ygrid)
+    # using those phases determine the radii using pillar_func
+    widths = pillar_func(phase_map)
+
+    substrate_segment = '''
+    structure = STRUCT_CHANNEL
+    extended = 1
+    begin.x = 0
+    begin.z = -(2*Offset)
+    begin.height = 2*ApertureRadius
+    begin.width = 2*ApertureRadius
+    begin.delta = 2*SubstrateIndex - background_index
+    end.x = 0 rel begin segment 1
+    end.y = 0 rel begin segment 1
+    end.z = 0
+    end.height = 2*ApertureRadius
+    end.width = 2*ApertureRadius
+    end.delta = 2*SubstrateIndex-background_index
+    '''
+    pillar_template = '''
+    extended = 1
+    structure = STRUCT_CHANNEL
+    position_taper = TAPER_LINEAR
+    begin.x = {pillar_x}
+    begin.y = {pillar_y}
+    begin.z = 0
+    begin.width = {pillar_diameter}
+    begin.height = {pillar_diameter}
+    begin.delta = PillarIndex-background_index
+    end.x = {pillar_x}
+    end.y = {pillar_y}
+    end.z = PillarHeight
+    end.width = {pillar_diameter}
+    end.height = {pillar_diameter}
+    end.delta = PillarIndex-background_index
+    '''
+
+    monitor_text = '''profile_type = PROF_INACTIVE
+	color = 2
+	type = TIMEMON_EXTENDED
+	timeaverage = 2
+	complexmonitor = 1
+	monitoroutputmask = 0
+	monitoroutputformat = OUTPUT_AMP_PHASE
+	fieldoutputmask = 126
+	frequencyanalysis = TIMEMON_FA_DFT
+	dx = {output_grid_pitch}
+	dy = {output_grid_pitch}
+	dz = 0
+	begin.x = 0
+	begin.z = PillarHeight
+	begin.height = ApertureRadius*2
+	begin.width = ApertureRadius*2
+    '''.format(**metal_config)
+
+    config = {'vars'   : {}, 
+            'segments' : [],
+            'monitors' : [],
+            'launch_fields' : {}
+            }
+
+    config_text = '''
+    filename = {circuitFname}
+    ApertureRadius = {ApertureRadius}
+    Offset = 2*lambda
+    PillarHeight = {PillarHeight}
+    PillarIndex = {PillarIndex}
+    SubstrateIndex = {SubstrateIndex}
+    Xmax = {ApertureRadius}
+    Xmin = -{ApertureRadius}
+    Ymax = {ApertureRadius}
+    Ymin = -{ApertureRadius}
+    Zmax = {PillarHeight} + Offset
+    Zmin = -(2*Offset)
+    alpha = 0
+    output_grid_pitch = free_space_wavelength/5.
+    background_index = {background_index}
+    boundary_max = Xmax
+    boundary_max_y = Ymax
+    boundary_min = Xmin
+    boundary_min_y = Ymin
+    cad_aspectratio = 1
+    delta = index-background_index
+    dimension = 3
+    domain_max = Zmax
+    domain_min = Zmin
+    eim = 0
+    fdtd_display_res_auto = DISPLAY_RES_AUTO
+    fdtd_monitor_time = lambda/4
+    fdtd_monitor_time_auto = MONITOR_TIME_AUTO
+    fdtd_pml_cells_enable = 1
+    fdtd_stop_auto = 1
+    fdtd_stop_time = 87
+    fdtd_stop_time_auto = 1
+    fdtd_time_step = 0.005681818182
+    fdtd_time_step_auto = 1
+    fdtd_update_time = 9*lambda/4
+    fdtd_update_time_auto = DISPLAY_TIME_AUTO
+    free_space_wavelength = {free_space_wavelength}
+    width = 1
+    height = width
+    index = 1
+    k0 = (2*pi)/free_space_wavelength
+    lambda = free_space_wavelength
+    launch_align_file = 1
+    launch_height = inf
+    launch_tilt = 1
+    launch_type = LAUNCH_PLANEWAVE
+    launch_width = inf
+    sim_tool = ST_FULLWAVE
+    structure = STRUCT_FIBER
+    '''.format(**metal_config)
+
+    config['vars'] = selfref_def_parser(config_text)
+
+    pillars = []
+    for (x, y, pill_width) in zip(np.ndarray.flatten(xgrid), 
+                     np.ndarray.flatten(ygrid), 
+                     np.ndarray.flatten(widths)):
+        if x**2 + y**2 > metal_config['ApertureRadius']**2:
+            continue
+        pillar_x = x
+        pillar_y = y
+        pillars.append([pillar_x, pillar_y, pill_width])
+    
+    config['segments'] = [
+        substrate_segment
+        ]
+    for idx, pillar in enumerate(pillars):
+        pillar_x, pillar_y, pillar_diameter = pillar
+        pillar_text = pillar_template.format(
+            pillar_x = pillar_x, pillar_y = pillar_y, pillar_diameter = pillar_diameter)
+        config['segments'].append(pillar_text)
+    for idx, segment in enumerate(config['segments']):
+        config['segments'][idx] = selfref_def_parser(segment,  config['vars'])
+
+    config['monitors'] = [selfref_def_parser(monitor_text, config['vars'])]
+
+    config['launch_fields'] = [selfref_def_parser('''
+        launch_pathway = 0
+        launch_type = LAUNCH_PLANEWAVE
+        launch_tilt = 1
+        launch_align_file = 1
+        ''', config['vars'])
+        ]
+    metal = PhotoCircuit(config)
+    return metal
+
+def fresnel_profile(focal_length, medium_wavelength):
+    '''
+    This function returns a function that takes x and y coordinates 
+    and returns the required phase pickup for the given focal length
+    and medium wavelength.
+    '''
+    def phase_func(x, y):
+        f = focal_length
+        return np.mod(-2*np.pi/medium_wavelength * (np.sqrt(x**2 + y**2 + f**2) -f), 2*np.pi)
+    return phase_func
+
+def atom_maker(config):
+    '''
+    This function determines the phase profile of meta-atoms with the given
+    characteristics.
+    The meta-atoms have a rectangular cross section.
+
+    Parameters
+    ----------
+    config : dict with keys:
+        'focal_length' : float
+            focal length of the lens
+        'medium_wavelength' : float
+            wavelength of the medium
+        'Period' : float
+            period of the square grid used to simulate the phase response of meta-atoms
+        'free_space_wavelength' : float
+            wavelength of the free space
+        'PillarIndex' : float
+            index of the pillar
+        'SubstrateIndex' : float
+            index of the substrate
+        'background_index' : float
+            index of the background
+        'Angle' : float
+            angle of the rectangular meta-atom
+        'fill_steps' : int
+            number of fill_factors to use
+        'Har' : int
+            how many harmonics are used in the RCWA simulation
+        'Aspect' : float
+            aspect ratio of the rectangular meta-atom
+    
+    Returns
+    -------
+    overlap_phases : np.array
+        overlap phases for each fill factor, given in radians
+    pillar_widths : list of floats
+        widths of the pillars corresponding to the phases
+    '''
+
+    overlap_magnitudes = []
+    overlap_phases     = []
+
+    fill_steps = config['fill_steps']
+    fills = np.linspace(0, 1, fill_steps)
+
+    pillar_widths = fills * config['Period']
+
+    if not os.path.exists('nanolib_rectangular_template.ind'):
+        print("nanolib_rectangular_template.ind not found. Creating...")
+        open('nanolib_rectangular_template.ind', 'w').write(nanolib_rectangular_template)
+
+    for fill in tqdm(fills):
+        simulscript = 'nanolib_rectangular_template.ind'
+        config['Fill'] = fill
+        omag, ophase = rectangular_meta_atom(config, 
+                                             simulscript, 
+                                             hide=True, 
+                                             cleanup=True)
+        overlap_magnitudes.append(omag)
+        overlap_phases.append(ophase)
+    overlap_magnitudes = np.array(overlap_magnitudes)
+    overlap_phases = np.array(overlap_phases)
+    try:
+        send_message('finished!')
+    except:
+        print("Error sending message.")
+    overlap_phases = overlap_phases/360*(2*np.pi)
+    overlap_phases = np.unwrap(overlap_phases)
+    overlap_phases = overlap_phases - np.min(overlap_phases)
+    overlap_phases = np.mod(overlap_phases, 2*np.pi)
+    return overlap_phases, pillar_widths
+    
