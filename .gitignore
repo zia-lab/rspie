@@ -101,6 +101,28 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# Rsoft files
+*.dat
+*.pcs
+*.log
+*.mds
+*.nef
+*.nlg
+*.pda
+*.far
+*.pfr
+*.ptscs
+*.tscs
+*.dataindex
+*.pdm
+*.smn
+*.dmn
+*.vtk
+*.fld
+*.pfd
+*.ptm
+*.pnm
+
 # Environments
 .env
 .venv
