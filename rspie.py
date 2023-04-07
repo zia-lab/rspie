@@ -9,6 +9,9 @@ from emfields import *
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
+module_file_path = os.path.abspath(__file__)
+module_directory = os.path.dirname(module_file_path)
+
 nanolib_rectangular_template = '''
 
 Angle = 0
@@ -395,7 +398,9 @@ class PhotoCircuit():
     '''
     def __init__(self, config):
         self.vars = config['vars']
-        self.full_filename = os.path.join(os.getcwd(), self.vars['filename'])
+        current_dir = os.getcwd()
+        self.sim_dir = os.path.join(current_dir, self.vars['filename'].replace('.ind',''))
+        self.full_filename = os.path.join(self.sim_dir, self.vars['filename'])
         self.segments = config['segments']
         self.monitors = config['monitors']
         self.launch_fields = config['launch_fields']
@@ -489,6 +494,9 @@ class PhotoCircuit():
         -------
         None
         '''
+        os.chdir(module_directory)
+        if not os.path.exists(self.sim_dir):
+            os.mkdir(self.sim_dir)
         with open(self.full_filename, 'w') as f:
             f.write(self.circuit_text)
     
@@ -505,6 +513,9 @@ class PhotoCircuit():
         None
         '''
         # save the file to disk
+        if not os.path.exists(self.sim_dir):
+            os.mkdir(self.sim_dir)
+        os.chdir(self.sim_dir)
         self.save_to_file()
         # run the circuit
         # in the philosophy of this script, any change in parameters
@@ -638,12 +649,13 @@ def load_2d_dat(fname):
     Returns
     -------
     (tuple): (x_coords, y_coords, num_array, file_format)
+        file_format (str): the format of the data in the file
         x_coords (np.ndarray): 1D array of the x coordinates
         y_coords (np.ndarray): 1D array of the y coordinates
         num_array (np.ndarray): 2D array of the data with each row corresponding to strip of 
                                 constant y and each column corresponding to a strip of constant x.
                                 The first row corresponds to the lowest (x,y) value pair.
-        file_format (str): the format of the data in the file
+        
     '''
     data_lines = open(fname,'r').readlines()
     field_format = data_lines[2].split(' ')[4]
@@ -903,6 +915,7 @@ def metamaker(metal_config):
 	monitoroutputmask = 0
 	monitoroutputformat = OUTPUT_AMP_PHASE
 	fieldoutputmask = 126
+    fieldoutputformat = OUTPUT_AMP_PHASE
 	frequencyanalysis = TIMEMON_FA_DFT
 	dx = {output_grid_pitch}
 	dy = {output_grid_pitch}
@@ -922,7 +935,7 @@ def metamaker(metal_config):
     config_text = '''
     filename = {circuitFname}
     ApertureRadius = {ApertureRadius}
-    Offset = 2*lambda
+    Offset = lambda/2
     PillarHeight = {PillarHeight}
     PillarIndex = {PillarIndex}
     SubstrateIndex = {SubstrateIndex}
@@ -956,6 +969,9 @@ def metamaker(metal_config):
     fdtd_time_step_auto = 1
     fdtd_update_time = 9*lambda/4
     fdtd_update_time_auto = DISPLAY_TIME_AUTO
+    grid_size = {grid_size}
+    grid_size_y = {grid_size}
+    step_size = {grid_size}
     free_space_wavelength = {free_space_wavelength}
     width = 1
     height = width
@@ -1014,7 +1030,7 @@ def fresnel_profile(focal_length, medium_wavelength):
     '''
     def phase_func(x, y):
         f = focal_length
-        return np.mod(-2*np.pi/medium_wavelength * (np.sqrt(x**2 + y**2 + f**2) -f), 2*np.pi)
+        return np.mod(2*np.pi/medium_wavelength * (np.sqrt(x**2 + y**2 + f**2) - f), 2*np.pi)
     return phase_func
 
 def atom_maker(config):
@@ -1048,6 +1064,10 @@ def atom_maker(config):
             how many harmonics are used in the RCWA simulation
         'Aspect' : float
             aspect ratio of the rectangular meta-atom
+        'min_width' : float
+            minimum width of the pillars
+        'max_width' : float
+            maximum width of the pillars
     
     Returns
     -------
@@ -1056,12 +1076,15 @@ def atom_maker(config):
     pillar_widths : list of floats
         widths of the pillars corresponding to the phases
     '''
-
+    os.chdir(module_directory)
+    
     overlap_magnitudes = []
     overlap_phases     = []
 
     fill_steps = config['fill_steps']
-    fills = np.linspace(0, 1, fill_steps)
+    min_fill = config['min_width']/config['Period']
+    max_fill = config['max_width']/config['Period']
+    fills = np.linspace(min_fill, max_fill, fill_steps)
 
     pillar_widths = fills * config['Period']
 
@@ -1087,6 +1110,5 @@ def atom_maker(config):
     overlap_phases = overlap_phases/360*(2*np.pi)
     overlap_phases = np.unwrap(overlap_phases)
     overlap_phases = overlap_phases - np.min(overlap_phases)
-    overlap_phases = np.mod(overlap_phases, 2*np.pi)
     return overlap_phases, pillar_widths
     
