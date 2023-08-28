@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from subprocess import check_output
+from subprocess import check_output, run
 import os
 import http.client, urllib
 from mysecrets import *
 from emfields import *
 from scipy.interpolate import interp1d
 from tqdm import tqdm
+import re
 
 module_file_path = os.path.abspath(__file__)
 module_directory = os.path.dirname(module_file_path)
@@ -374,11 +375,11 @@ class PhotoCircuit():
         the corresponding circuit file.
 
         'monitors':  a  list of dictionaries with keys sufficient to
-        define  them.  Again  best  way to figure out which keys are
+        define  them.  Again, best  way to figure out which keys are
         sufficient   is  to  create  a  similar  circuit  in  RSoft.
         
         'launch_fields': a list of dictionaries with keys sufficient
-        to  define them. Again best way to figure out which keys are
+        to define them. Again, best way to figure out which keys are
         sufficient is to create a similar circuit in RSoft.
     
     This class has the following function attributes:
@@ -469,6 +470,7 @@ class PhotoCircuit():
         Parameters
         ----------
         None
+
         Returns
         -------
         None
@@ -524,7 +526,7 @@ class PhotoCircuit():
         # If using command line flags is necessary, a custom
         # command line parser should be written.
         cmd = [self.executable, self.full_filename, 'wait=0']
-        check_output(cmd, shell=True)
+        run(cmd, shell=True, cwd=self.sim_dir)
 
     def open_in_RSoft(self):
         '''
@@ -599,9 +601,11 @@ def load_3d_dat(fname):
     '''
     This function can be used to load a 3D .dat file from RSoft.
     It assumes that the file has real-valued data.
+
     Parameters
     ----------
     fname (str): path to the .dat file
+
     Returns
     -------
     x_coords, y_coords, z_coords, num_array (tuple): (x_coords, y_coords, z_coords, num_array)
@@ -668,6 +672,7 @@ def load_2d_dat(fname):
     data_lines = data_lines[4:]
     num_array = []
     for line in data_lines:
+        line = line.strip()
         nums = line.split('  ')
         nums = [float(x) for x in nums]
         num_array.append(nums)
@@ -1111,4 +1116,244 @@ def atom_maker(config):
     overlap_phases = np.unwrap(overlap_phases)
     overlap_phases = overlap_phases - np.min(overlap_phases)
     return overlap_phases, pillar_widths
+
+fiber_script = '''
+
+Box_width = 4*Core_radius
+Cladding_index = 1.46147
+Core_delta = Core_index-Cladding_index
+Core_index = 1.45804
+Core_radius = 0.7
+Fiber_height = 0
+Grid_resolution = 0.05
+Index_resolution = 0.1
+Launch_mode = 1
+Max_modes = 5
+Mode_resolution = 0.1
+PML_width = 0.3
+Xmax = Box_width/2
+Ymax = Box_width/2
+Zmax = Fiber_height
+alpha = 0
+background_index = 1
+boundary_max = Xmax
+boundary_max_y = Ymax
+boundary_min = -Xmax
+boundary_min_y = -Ymax
+cad_aspectratio = 1
+cad_aspectratio_y = 1
+color_outline = 14
+color_scale = fireice.scl
+delta = Core_index-Cladding_index
+dimension = 3
+domain_max = Zmax
+eim = 0
+free_space_wavelength = 0.65
+height = width
+idbpm_convergence_warning = 0
+k0 = (2*pi)/free_space_wavelength
+launch_align_file = 1
+launch_mode = 2
+launch_tilt = 1
+launch_type = LAUNCH_GAUSSIAN
+mode_launch_type = 1
+mode_output_format = OUTPUT_REAL_IMAG
+neff_log = 1
+pml_width_x = PML_width
+pml_width_y = PML_width
+polarization = 0
+rcwa_index_res_x = Index_resolution
+rcwa_index_res_y = Index_resolution
+rcwa_index_res_z = Index_resolution
+rcwa_output_field = 1
+rcwa_output_field_ex = 1
+rcwa_output_field_ey = 1
+rcwa_output_field_ez = 1
+rcwa_output_field_format = 1
+rcwa_output_option = 1
+sim_tool = ST_BEAMPROP
+structure = STRUCT_FIBER
+vector = 1
+width = 1
+
+
+segment 1
+	structure = STRUCT_FIBER
+	color = 2
+	comp_name = core
+	extended = 1
+	begin.x = 0
+	begin.z = 0
+	begin.height = 2*Core_radius
+	begin.width = 2*Core_radius
+	begin.delta = Core_delta
+	end.x = 0 rel begin segment 1
+	end.y = 0 rel begin segment 1
+	end.z = Fiber_height rel begin segment 1
+	end.height = 2*Core_radius
+	end.width = 2*Core_radius
+	end.delta = Core_delta
+end segment
+
+time_monitor 2
+	profile_type = PROF_INACTIVE
+	color = 2
+	type = TIMEMON_EXTENDED
+	timeaverage = 2
+	monitoroutputmask = 128
+	xsize = 2*Core_radius
+	ysize = 2*Core_radius
+	begin.x = 0
+	begin.z = 0
+	begin.height = 2*Core_radius
+	begin.width = 2*Core_radius
+end time_monitor
+
+launch_field 1
+	launch_pathway = 0
+	launch_type = LAUNCH_GAUSSIAN
+	launch_tilt = 1
+	launch_mode = 2
+	launch_align_file = 1
+end launch_field
+
+'''
+
+def waveguide_modes(config, cleanup=True, verbose=False):
+    '''
+    Parameters
+    ----------
+    config : dict
+        dictionary of parameters for the simulation
+    simulscript : str
+        path to the simulation script
+    cleanup : bool
+        whether to delete the mode files after the simulation is complete
+    verbose : bool
+        whether to print the output of the simulation to the console
+    Returns
+    -------
+    modes : list of dicts
+        list of mode dictionaries, each with keys:
+            'mode' : np.array
+                mode field
+            'neff' : float
+                effective index of the mode
+            'width' : float
+                width of the mode
+            'height' : float
+                height of the mode
+    '''
+    if 'comments' in config:
+        comments = config['comments']
+        del config['comments']
+    else:
+        comments = ''
     
+    # Circuit files are just text files, so we can read them in
+    simulscript_txt = fiber_script
+    mode_dir = 'C:/Users/lab_pc_cryo/Documents/Photonic_Tools/fiber_modes/'
+    simulscript = os.path.join(mode_dir, 'fiber_modes.ind')
+    open(simulscript, 'w').write(simulscript_txt)
+    os.chdir(mode_dir)
+
+    if 'polarization' in config:
+        pol = {0:'TE', 1:'TM'}[config['polarization']]
+    else:
+        pol = None
+
+    # Remove old mode files
+    if cleanup:
+        files = os.listdir(mode_dir)
+        mode_files = [os.path.join(mode_dir,f) for f in files if re.match('[m,p]\d+', f.split('.')[-1])]
+        for f in mode_files:
+            os.remove(f)
+    
+    # Compute/grab a few useful figures
+    n_core = config['Core_index']
+    n_cladding = config['Cladding_index']
+    core_radius = config['Core_radius']
+    wavelength = config['free_space_wavelength']
+    NA = np.sqrt(n_core**2 - n_cladding**2)
+    V_num = 2 * np.pi * core_radius / wavelength * NA
+    numModes_approx = 4 * V_num**2 / np.pi**2
+    if verbose:
+        print('There should be about %.1f modes.' % numModes_approx)
+    
+
+    # Put together the command to run the simulation
+    cmd = ['bsimw32', simulscript, 'wait=0']
+    num_params = ['%s=%f' % (k, v) for k, v in config.items() if type(v) in [int, float, np.float64]]
+    str_params = ['%s=%s' % (k, v) for k, v in config.items() if type(v) == str]
+    cmd = cmd + num_params + str_params
+    
+    # Run it
+    check_output(cmd, shell=True)
+
+    # Query the filenames for the computed fields and effective refractive indices
+    files = os.listdir(mode_dir)
+    mode_files = [os.path.join(mode_dir,f) for f in files if re.match('m\d+', f.split('.')[-1])]
+    try:
+        nef_file = os.path.join(mode_dir, config['prefix']+'.nef')
+        neffs = np.genfromtxt(nef_file)
+        if len(neffs.shape) == 1:
+            neffs = neffs.reshape((1,neffs.shape[0]))
+        neffs = neffs[:,1:]
+        neffs = neffs[:,0]+1j*neffs[:,1]
+        if np.max(np.imag(neffs)) == 0:
+            neffs = np.real(neffs)
+        neffs = neffs.T
+    except:
+        neffs = None
+    
+    # Put all the output together in a dictionary
+    output = {'neffs': neffs,
+              'V':V_num,
+              'NA':NA,
+              'numModes_approx': numModes_approx,
+              'mode_files': mode_files,
+              'config': config,
+              'simulscript': simulscript,
+              'cmd': cmd,
+              'simulscript_txt': simulscript_txt}
+    
+    # If there are comments put them back in the ouput
+    if comments:
+        output['comments'] = comments
+    return output
+
+def load_mode_data(filename):
+    '''This function can be used to read
+    the data stores in the output fiels from
+    the Photonic Tools mode solver.
+    
+    Parameters
+    ----------
+    filename : str
+
+    Returns
+    -------
+    extent (tuple), lines(np.array), n_eff (np.array)
+    
+    '''
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        metadata = lines[:4]
+        n_eff = metadata[2].split(' ')[5]
+        output_type = lines[2].split(' ')[4]
+        xmin, xmax = metadata[2].split(' ')[1:3]
+        zmin, zmax = metadata[3].split(' ')[1:3]
+        lines = lines[4:]
+        lines = [line.strip() for line in lines]
+        lines = [line.split() for line in lines]
+        lines = [[float(x) for x in line] for line in lines]
+        extent = (float(xmin), float(xmax), float(zmin), float(zmax))
+    lines = np.array(lines).T
+    if output_type == 'OUTPUT_REAL_IMAG_3D':
+        lines_re = lines[0::2]
+        lines_im = lines[1::2]
+        if np.max(np.abs(lines_im)) == 0:
+            lines = lines_re
+        else:
+            lines = lines_re + 1j*lines_im
+    return extent, lines, n_eff
